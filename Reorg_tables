@@ -1,0 +1,35 @@
+Reorg table:-
+========================================================================================================================
+If single table
+========================
+alter table DUMM.customer move tablespace CUST_TBS;
+
+If partition
+========================
+ALTER TABLE DUMM.INVOICE MOVE PARTITION INVOICES_Q2 TABLESPACE CUST_TBS;
+
+Autoscript for partition tables
+================================================
+Select 'ALTER TABLE '||p.Table_owner||'.'||p.TABLE_NAME||' MOVE PARTITION '||p.PARTITION_NAME||' TABLESPACE '|| p.TABLESPACE_NAME ||';' 
+from dba_tab_partitions p, dba_segments s where p.table_owner = s.owner and p.partition_name = s.partition_name
+and 	p.table_name = s.segment_name
+And table_owner not in ('SYS', 'SYSTEM')
+and upper(table_name) = upper('&table_name');
+
+ALTER TABLE DUMM.INVOICE MOVE PARTITION INVOICES_Q2 TABLESPACE CUST_TBS;
+
+
+If subpartition
+========================
+ALTER TABLE DUMM.sales MOVE SUBPARTITION T3_P1_S1 TABLESPACE CUST_TBS;
+
+autoscript for subpartition tables
+================================================
+Select 'ALTER TABLE '||p.Table_owner||'.'||p.TABLE_NAME||' MOVE SUBPARTITION '||p.subPARTITION_NAME||' TABLESPACE DHDS_DATA01;' 
+from dba_tab_subpartitions p, dba_segments s 
+where p.table_owner = s.owner 
+and p.subpartition_name = s.partition_name
+and     p.table_name = s.segment_name
+and s.SEGMENT_TYPE = 'TABLE SUBPARTITION'
+And table_owner not in ('SYS', 'SYSTEM')
+and upper(table_name) = upper('&table_name');
