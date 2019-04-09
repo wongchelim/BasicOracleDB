@@ -1,0 +1,22 @@
+select /*+ RULE */ t.table_owner, t.table_name, t.partition_name, s.tablespace_name, t.num_rows, t.avg_row_len,
+round((greatest(t.num_rows, 1)) * t.avg_row_len/1024/1024) You_can_Reorg_until, round(s.bytes/1024/1024) What_u_see_mb
+from dba_tab_partitions t, dba_segments s
+where t.table_owner = s.owner
+and t.table_name = s.segment_name
+and t.partition_name = s.partition_name
+and t.table_owner in ('DUMM')
+
+                                                                              TABLESPACE
+TABLE_OWNER               TABLE_NAME                     PARTITION_NAME       NAME                         NUM_ROWS AVG_ROW_LEN YOU_CAN_REORG_UNTIL WHAT_U_SEE_MB
+------------------------- ------------------------------ -------------------- -------------------- ---------------- ----------- ------------------- -------------
+DUMM                      INVOICE                        INVOICES_Q2          CUST_TBS                       20,000          15                   0             8
+DUMM                      INVOICE                        INVOICES_Q3          CUST_TBS                       28,500          18                   0             8
+DUMM                      INVOICE_2                      INVOICES_Q1          CUST_TBS                    1,350,010          13                  17            45
+DUMM                      INVOICE_2                      INVOICES_Q2          CUST_TBS                       20,000          11                   0             8
+DUMM                      INVOICE_2                      INVOICES_Q3          CUST_TBS                      130,000          13                   2             8
+                                                                                                   ----------------
+sum                                                                                                       1,548,510
+
+
+above are the example for partition table...
+for subpartition and non-partition table have their own queries....
