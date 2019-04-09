@@ -1,0 +1,43 @@
+Check the Overall DB status
+=================================================================================
+select inst_id, name, DATABASE_ROLE, SWITCHOVER_STATUS, DATAGUARD_BROKER ,GUARD_STATUS, open_mode,flashback_on, log_mode from gv$database order by inst_id;
+
+   INST_ID NAME      DATABASE_ROLE    SWITCHOVER_STATUS    DATAGUAR GUARD_S OPEN_MODE            FLASHBACK_ON       LOG_MODE
+---------- --------- ---------------- -------------------- -------- ------- -------------------- ------------------ ------------
+         1 SAMPLE    PRIMARY          NOT ALLOWED          DISABLED NONE    READ WRITE           NO                 ARCHIVELOG
+
+
+
+Check the Instance status
+=================================================================================
+select inst_id,instance_name,instance_role,status,host_name, to_char(startup_time, 'ddmmyyyy:hh24:mi:ss') "Startup since" from gv$instance order by inst_id;
+
+   INST_ID INSTANCE_NAME    INSTANCE_ROLE      STATUS       HOST_NAME                                                        Startup since
+---------- ---------------- ------------------ ------------ ---------------------------------------------------------------- ------------------------------
+         1 sample1          PRIMARY_INSTANCE   OPEN         oel7oradb1                                                       09042019:13:41:30
+
+
+Check the DB version
+=================================================================================
+SELECT * FROM V$VERSION;
+BANNER                                                                               CON_ID
+-------------------------------------------------------------------------------- ----------
+Oracle Database 12c Enterprise Edition Release 12.2.0.1.0 - 64bit Production              0
+PL/SQL Release 12.2.0.1.0 - Production                                                    0
+CORE    12.2.0.1.0      Production                                                                0
+TNS for Linux: Version 12.2.0.1.0 - Production                                            0
+NLSRTL Version 12.2.0.1.0 - Production                                                    0
+
+Check the DB space
+=================================================================================
+select name, total_mb, free_mb,state,type, (total_mb-free_mb) "used MB",(free_mb/decode(total_mb,0,1,total_mb))*100 "Free Space %" from v$asm_diskgroup;
+
+NAME                             TOTAL_MB    FREE_MB STATE       TYPE      used MB Free Space %
+------------------------------ ---------- ---------- ----------- ------ ---------- ------------
+ARCH_1                               8192       8009 CONNECTED   EXTERN        183   97.7661133
+DATA_1                              98304      94847 CONNECTED   EXTERN       3457   96.4833577
+DATA_2                              92160      92048 MOUNTED     EXTERN        112   99.8784722
+GRID_1                              15360      14752 MOUNTED     NORMAL        608   96.0416667
+MGMT                                37690       3808 MOUNTED     EXTERN      33882   10.1034757
+                               ---------- ----------                    ----------
+sum                                251706     213464                         38242
