@@ -1,0 +1,113 @@
+This is to demo to merge diskgroup DATA_2 to the DATA_1
+Diskgroup structure as per below...
+============================================================================================================
+NAME            TOTAL_MB    FREE_MB STATE       TYPE      used MB Free Space %
+------------- ---------- ---------- ----------- ------ ---------- ------------
+ARCH_1              8192       7642 CONNECTED   EXTERN        550   93.2861328
+DATA_1             98304      94847 CONNECTED   EXTERN       3457   96.4833577
+DATA_2             92160      92048 MOUNTED     EXTERN        112   99.8784722
+GRID_1             15360      14752 MOUNTED     NORMAL        608   96.0416667
+MGMT               37690       3800 MOUNTED     EXTERN      33890   10.0822499
+
+
+            GROUP   DISK
+   INST_ID NUMBER NUMBER NAME          STATE    PATH                                  FAILGROUP     MODE_ST HEADER_STATU MOUNT_S CREATE_DA    OS_MB   TOTAL_MB    FREE_MB
+---------- ------ ------ ------------- -------- ------------------------------------- ------------- ------- ------------ ------- --------- -------- ---------- ----------
+         1      1      0 ARCH_1_0000   NORMAL   /dev/oracleasm/disks/ARC_LUN2         ARCH_1_0000   ONLINE  MEMBER       CACHED  05-MAR-19     4096       4096       3828
+         1      1      1 ARCH_1_0001   NORMAL   /dev/oracleasm/disks/ARC_LUN1         ARCH_1_0001   ONLINE  MEMBER       CACHED  05-MAR-19     4096       4096       3823
+         1      2      0 DATA_1_0000   NORMAL   /dev/oracleasm/disks/DATA01           DATA_1_0000   ONLINE  MEMBER       CACHED  28-FEB-19    32768      32768      31616
+         1      2      1 DATA_1_0001   NORMAL   /dev/oracleasm/disks/DATA02           DATA_1_0001   ONLINE  MEMBER       CACHED  28-FEB-19    32768      32768      31613
+         1      2      2 DATA_1_0002   NORMAL   /dev/oracleasm/disks/DATA03           DATA_1_0002   ONLINE  MEMBER       CACHED  28-FEB-19    32768      32768      31618
+         1      3      0 DATA_2_0000   NORMAL   /dev/oracleasm/disks/DATA201          DATA_2_0000   ONLINE  MEMBER       CACHED  20-MAR-19    30720      30720      30676
+         1      3      1 DATA_2_0001   NORMAL   /dev/oracleasm/disks/DATA202          DATA_2_0001   ONLINE  MEMBER       CACHED  20-MAR-19    30720      30720      30684
+         1      3      2 DATA_2_0002   NORMAL   /dev/oracleasm/disks/DATA203          DATA_2_0002   ONLINE  MEMBER       CACHED  20-MAR-19    30720      30720      30688
+         1      4      0 GRID_1_0000   NORMAL   /dev/oracleasm/disks/OCR_CSS2         GRID_1_0000   ONLINE  MEMBER       CACHED  28-FEB-19     5120       5120       4917
+         1      4      1 GRID_1_0001   NORMAL   /dev/oracleasm/disks/OCR_CSS3         GRID_1_0001   ONLINE  MEMBER       CACHED  28-FEB-19     5120       5120       4917
+         1      4      2 GRID_1_0002   NORMAL   /dev/oracleasm/disks/OCR_CSS1         GRID_1_0002   ONLINE  MEMBER       CACHED  28-FEB-19     5120       5120       4918
+         1      5      0 MGMT_0000     NORMAL   /dev/oracleasm/disks/MGMT1            MGMT_0000     ONLINE  MEMBER       CACHED  28-FEB-19    18845      18845       1897
+         1      5      1 MGMT_0001     NORMAL   /dev/oracleasm/disks/MGMT2            MGMT_0001     ONLINE  MEMBER       CACHED  28-FEB-19    18845      18845       1903
+                                                                                                                                                    ----------
+sum                                                                                                                                                     251706
+
+
+See if there any data files created inside the diskgroup that you want to drop and perform rebalance merge with a single diskgroup.
+====================================================================================================================================
+Check who using the diskgroup...
+======================================================
+13:32:27 SYS@SAMPLE1 SQL> select file_name,bytes/1024/1024,status,file_id, AUTOEXTENSIBLE,maxbytes/1024/1024/1024 MaxGB from dba_data_files where file_name like '%DATA_2%';
+
+no rows selected
+
+and also check using asmcmd utility to double comfirm.
+======================================================
+[oracle@oel7oradb1 ~]$ asmcmd
+ASMCMD> ls
+ARCH_1/
+DATA_1/
+DATA_2/
+GRID_1/
+MGMT/
+ASMCMD> cd DATA_2/
+ASMCMD> ls
+ASMCMD>
+
+Perform the drop
+======================================================
+13:46:35 ASM1 SQL>DROP DISKGROUP DATA_2 INCLUDING CONTENTS;
+
+Diskgroup dropped.
+
+Elapsed: 00:00:04.05
+
+Add in DATA_1 from the recent drop diskgroup
+======================================================
+alter diskgroup DATA_1 add disk 
+'/dev/oracleasm/disks/DATA201',
+'/dev/oracleasm/disks/DATA202',
+'/dev/oracleasm/disks/DATA203'
+rebalance power 8;
+
+Diskgroup altered.
+
+Elapsed: 00:00:03.29
+13:49:26 ASM1 SQL>
+
+
+
+As you can see they had melt into the same diskgroup.
+*Note, whenever you add in new LUNs to the same diskgroup. Please do make sure that the size of each new LUNs the same size as the existing LUNs. 
+As below just for demo purpose.
+==================================================================================================================================================================
+13:49:26 ASM1 SQL>select name, total_mb, free_mb,state,type, (total_mb-free_mb) "used MB",(free_mb/decode(total_mb,0,1,total_mb))*100 "Free Space %" from v$asm_diskgroup;
+
+NAME                             TOTAL_MB    FREE_MB STATE       TYPE      used MB Free Space %
+------------------------------ ---------- ---------- ----------- ------ ---------- ------------
+ARCH_1                               8192       7636 MOUNTED     EXTERN        556   93.2128906
+DATA_1                             190464     186998 MOUNTED     EXTERN       3466   98.1802335
+GRID_1                              15360      14752 MOUNTED     NORMAL        608   96.0416667
+MGMT                                37690       3797 MOUNTED     EXTERN      33893   10.0742903
+                               ---------- ----------                    ----------
+sum                                251706     213183                         38523
+
+
+
+            GROUP   DISK
+   INST_ID NUMBER NUMBER NAME          STATE    PATH                                  FAILGROUP     MODE_ST HEADER_STATU MOUNT_S CREATE_DATE           OS_MB   TOTAL_MB    FREE_MB
+---------- ------ ------ ------------- -------- ------------------------------------- ------------- ------- ------------ ------- ------------------ -------- ---------- ----------
+         1      1      0 ARCH_1_0000   NORMAL   /dev/oracleasm/disks/ARC_LUN2         ARCH_1_0000   ONLINE  MEMBER       CACHED  05-MAR-19 11:41:59     4096       4096       3821
+         1      1      1 ARCH_1_0001   NORMAL   /dev/oracleasm/disks/ARC_LUN1         ARCH_1_0001   ONLINE  MEMBER       CACHED  05-MAR-19 11:41:59     4096       4096       3815
+         1      2      0 DATA_1_0000   NORMAL   /dev/oracleasm/disks/DATA01           DATA_1_0000   ONLINE  MEMBER       CACHED  28-FEB-19 13:56:45    32768      32768      32473
+         1      2      1 DATA_1_0001   NORMAL   /dev/oracleasm/disks/DATA02           DATA_1_0001   ONLINE  MEMBER       CACHED  28-FEB-19 13:56:45    32768      32768      32472
+         1      2      2 DATA_1_0002   NORMAL   /dev/oracleasm/disks/DATA03           DATA_1_0002   ONLINE  MEMBER       CACHED  28-FEB-19 13:56:45    32768      32768      32473
+         1      2      3 DATA201       NORMAL   /dev/oracleasm/disks/DATA201          DATA201       ONLINE  MEMBER       CACHED  10-APR-19 13:49:23    30720      30720      29860
+         1      2      4 DATA202       NORMAL   /dev/oracleasm/disks/DATA202          DATA202       ONLINE  MEMBER       CACHED  10-APR-19 13:49:23    30720      30720      29860
+         1      2      5 DATA203       NORMAL   /dev/oracleasm/disks/DATA203          DATA203       ONLINE  MEMBER       CACHED  10-APR-19 13:49:23    30720      30720      29860
+         1      4      0 GRID_1_0000   NORMAL   /dev/oracleasm/disks/OCR_CSS2         GRID_1_0000   ONLINE  MEMBER       CACHED  28-FEB-19 12:32:32     5120       5120       4917
+         1      4      1 GRID_1_0001   NORMAL   /dev/oracleasm/disks/OCR_CSS3         GRID_1_0001   ONLINE  MEMBER       CACHED  28-FEB-19 12:32:32     5120       5120       4917
+         1      4      2 GRID_1_0002   NORMAL   /dev/oracleasm/disks/OCR_CSS1         GRID_1_0002   ONLINE  MEMBER       CACHED  28-FEB-19 12:32:32     5120       5120       4918
+         1      5      0 MGMT_0000     NORMAL   /dev/oracleasm/disks/MGMT1            MGMT_0000     ONLINE  MEMBER       CACHED  28-FEB-19 12:41:47    18845      18845       1896
+         1      5      1 MGMT_0001     NORMAL   /dev/oracleasm/disks/MGMT2            MGMT_0001     ONLINE  MEMBER       CACHED  28-FEB-19 12:41:47    18845      18845       1901
+                                                                                                                                                             ---------- ----------
+sum                                                                                                                                                              251706     213183
+
+13 rows selected.
