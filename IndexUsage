@@ -1,0 +1,82 @@
+Some demo on index usage on Oracle 12cR2.
+
+Here I want to show some example of index usage on Oracle DB 12cR2. As this is 12cR2 the index usage monitor view might be different from 
+other version of Oracle DB prior on this DB and might as well in the future DB release.
+So, do serve this as a guidance not a ultimate solution forever and ever on monitoring the index.
+
+To enable a index monitor for a table
+SELECT 'ALTER INDEX "' || i.owner || '"."' || i.index_name || '" MONITORING USAGE;'
+FROM   dba_indexes i
+WHERE  table_name = 'TABLE_NAME_YOURSELF';
+
+To Disable a index monitor for a table
+SELECT 'ALTER INDEX "' || i.owner || '"."' || i.index_name || '" NOMONITORING USAGE;'
+FROM   dba_indexes i
+WHERE  table_name = 'TABLE_NAME_YOURSELF';
+
+In prior version of db, the index monitor usage might counted as used when a gather stat run on that table. Which I no longer want to prove.
+But in the 12cR2 version the index will be excluded from count as used when a gather stat run on that table. Which is good.
+I just tested a sample scenario 
+
+select u.name "Owner"
+, io.name "index name"
+, t.name "table name"
+, decode(bitand(i.flags, 65536), 0, 'NO', 'YES') "MON"
+, decode(bitand(ou.flags, 1), 0, 'NO', 'YES') "USED"
+, ou.start_monitoring
+, ou.end_monitoring
+from
+sys.user$ u
+, sys.obj$ io
+, sys.obj$ t
+, sys.ind$ i
+, sys.object_usage ou
+where
+i.obj# = ou.obj#
+and io.obj# = ou.obj#
+and t.obj# = i.bo#
+and u.user# = io.owner#
+and io.name in ('&indexName');
+
+Owner                index name           table name           MON USE START_MONITORING    END_MONITORING
+-------------------- -------------------- -------------------- --- --- ------------------- -------------------
+DUMM                 INVOICE_LOCAL_IDX    INVOICE              YES NO  04/10/2019 11:29:19
+
+EXEC DBMS_STATS.GATHER_TABLE_STATS(ownname => '&owner',tabname => '&table',ESTIMATE_PERCENT =>DBMS_STATS.AUTO_SAMPLE_SIZE, block_sample => FALSE, degree => 8,method_opt => 'FOR ALL INDEXED COLUMNS SIZE AUTO',granularity => 'ALL',cascade => TRUE, NO_INVALIDATE=>FALSE);
+Enter value for owner: DUMM
+Enter value for table: INVOICE
+
+PL/SQL procedure successfully completed.
+
+
+Owner                index name           table name           MON USE START_MONITORING    END_MONITORING
+-------------------- -------------------- -------------------- --- --- ------------------- -------------------
+DUMM                 INVOICE_LOCAL_IDX    INVOICE              YES NO  04/10/2019 11:29:19
+
+
+set autotrace on;
+select * from DUMM.INVOICE where invoice_place = 'ENG';
+
+Execution Plan
+----------------------------------------------------------
+Plan hash value: 1906454251
+
+--------------------------------------------------------------------------------------------------------------------------------
+| Id  | Operation                                  | Name              | Rows  | Bytes | Cost (%CPU)| Time     | Pstart| Pstop |
+--------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT                           |                   | 44996 |   747K|    74   (0)| 00:00:01 |       |       |
+|   1 |  PARTITION LIST SINGLE                     |                   | 44996 |   747K|    74   (0)| 00:00:01 |   KEY |   KEY |
+|   2 |   TABLE ACCESS BY LOCAL INDEX ROWID BATCHED| INVOICE           | 44996 |   747K|    74   (0)| 00:00:01 |     3 |     3 |
+|*  3 |    INDEX RANGE SCAN                        | INVOICE_LOCAL_IDX | 44996 |       |    35   (0)| 00:00:01 |     3 |     3 |
+--------------------------------------------------------------------------------------------------------------------------------
+
+SQL> /
+
+
+Owner                index name           table name           MON USE START_MONITORING    END_MONITORING
+-------------------- -------------------- -------------------- --- --- ------------------- -------------------
+DUMM                 INVOICE_LOCAL_IDX    INVOICE              YES YES 04/10/2019 11:29:19
+
+
+As show above it displayed as used after a trully execution used the index.
+
