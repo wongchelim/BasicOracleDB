@@ -1,0 +1,4 @@
+If the LUNs space were increased by the storage team inside your organization.
+You may just require to resize and rebalance the existing LUNs.
+
+alter diskgroup DATA_1 resize all rebalance power 4;
