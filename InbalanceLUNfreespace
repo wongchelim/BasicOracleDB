@@ -1,0 +1,18 @@
+if you noticed free_mb is zero or less than others amount for some LUNs
+Login to the ASM instance and start perfoming below command.
+
+SQL> alter diskgroup DATA_1 rebalance power 5;
+now its rebalancing
+SQL> select * from v$asm_operation; 
+
+GROUP_NUMBER OPERA STAT      POWER     ACTUAL      SOFAR   EST_WORK   EST_RATE EST_MINUTES
+------------ ----- ---- ---------- ---------- ---------- ---------- ---------- -----------
+           2 REBAL WAIT          5          0          0          0          0           0
+SQL> /
+GROUP_NUMBER OPERA STAT      POWER     ACTUAL      SOFAR   EST_WORK   EST_RATE EST_MINUTES
+------------ ----- ---- ---------- ---------- ---------- ---------- ---------- -----------
+           2 REBAL RUN           5          5        120     155502       1059         146
+           
+Below parameter
+Show parameter asm_power_limit  <-- this could make it fast on the distrubution. And it can slow down the performance on the db.
+Thus, it is better to use the rebalance command to rebalance itself.
