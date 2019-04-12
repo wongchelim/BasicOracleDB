@@ -1,0 +1,26 @@
+This is to explain the restart of the Oracle DB 12c.
+Of course, if you just you alone using the DB as test environment might be no need to consider much of restarting the DB.
+But for the production DB that currently accessed by many users. You need to perform this VERY VERY carefull.
+
+Scan for any active sessions
+==========================================
+select username,count(*) from gv$session where type='USER' and status='ACTIVE' group by username;
+
+Clear all users sessions if needed. Check all of them related to any crucial processes. 
+Once all processes clarified with respective owner done.
+
+We can now shutdown the DB.
+============================
+SQL> shutdown immediate;
+
+Or
+Noted. If oracle clusterware installed... Issue below at the command prompt
+srvctl stop database
+
+To start back.
+==========================================
+SQL> startup;
+
+or 
+Noted. If oracle clusterware installed... Issue below at the command prompt
+srvctl start database
