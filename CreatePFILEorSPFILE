@@ -1,0 +1,17 @@
+To create a spfile from pfile
+==============================
+create spfile='+DATA_1' from pfile='/u01/app/oracle/product/12.2.0.1/db_1/dbs/compEn3.ora';
+
+It will automatically created into respective spfile directory inside the ASM
+
+To create a pfile from spfile
+==============================
+create pfile from spfile
+
+It will create a default naming pfile inside the dbs directory.
+or else you can specify the directory yourself
+
+create pfile='/home/oracle/my.ora' from spfile
+
+
+There are lot more options available.... just to show some basic but some important ones....
