@@ -1,0 +1,80 @@
+SELECT client_name, status, PRIORITY_OVERRIDE,USE_RESOURCE_ESTIMATES, ATTRIBUTES FROM dba_autotask_operation;
+SQL> SQL> SQL> SQL>
+CLIENT_NAME                       STATUS   PRIORIT USE_R ATTRIBUTES
+--------------------------------- -------- ------- ----- ----------------------------------------------------------------------------------------------------
+auto optimizer stats collection   ENABLED          FALSE ON BY DEFAULT, VOLATILE, SAFE TO KILL
+auto space advisor                ENABLED          FALSE ON BY DEFAULT, VOLATILE, SAFE TO KILL
+sql tuning advisor                ENABLED          FALSE ONCE PER WINDOW, ON BY DEFAULT, VOLATILE, SAFE TO KILL
+
+SQL> select JOB_NAME,STATUS,ACTUAL_START_DATE,RUN_DURATION,ADDITIONAL_INFO FROM dba_scheduler_job_run_details WHERE (job_name LIKE 'ORA$AT_OS_OPT%' OR job_name='GATHER_STATS_JOB') order by LOG_ID desc;
+
+JOB_NAME                       STATUS                         ACTUAL_START_DATE                    RUN_DURATION         ADDITIONAL_INFO
+------------------------------ ------------------------------ ------------------------------------ -------------------- ----------------------------------------
+ORA$AT_OS_OPT_SY_21            FAILED                         13-MAR-19 11.13.14.507312 PM +08:00  +000 00:01:06        ORA-20001: Statistics Advisor: Invalid t
+                                                                                                                        ask name for the current user
+                                                                                                                        ORA-06512: at "SYS.DBMS_STATS", line 472
+                                                                                                                        07
+                                                                                                                        ORA-06512: at "SYS.DBMS_STATS_ADVISOR",
+                                                                                                                        line 882
+                                                                                                                        ORA-06512: at "SYS.DBMS_STATS_INTERNAL",
+                                                                                                                         line 20059
+                                                                                                                        ORA-06512: at "SYS.DBMS_STATS_INTERNAL",
+                                                                                                                         line 22201
+                                                                                                                        ORA-06512: at "SYS.DBMS_STATS", line 471
+                                                                                                                        97
+
+ORA$AT_OS_OPT_SY_1             FAILED                         13-MAR-19 10.09.02.504502 PM +08:00  +000 00:07:56        ORA-20001: Statistics Advisor: Invalid t
+                                                                                                                        ask name for the current user
+                                                                                                                        ORA-06512: at "SYS.DBMS_STATS", line 472
+                                                                                                                        07
+                                                                                                                        ORA-06512: at "SYS.DBMS_STATS_ADVISOR",
+                                                                                                                        line 882
+                                                                                                                        ORA-06512: at "SYS.DBMS_STATS_INTERNAL",
+                                                                                                                         line 20059
+                                                                                                                        ORA-06512: at "SYS.DBMS_STATS_INTERNAL",
+                                                                                                                         line 22201
+                                                                                                                        ORA-06512: at "SYS.DBMS_STATS", line 471
+                                                                                                                        97
+
+
+
+SQL> select name, ctime, how_created from sys.wri$_adv_tasks
+where owner_name = 'SYS'
+and name in ('AUTO_STATS_ADVISOR_TASK','INDIVIDUAL_STATS_ADVISOR_TASK');  2    3
+
+no rows selected
+
+SQL> EXEC dbms_stats.init_package();
+
+PL/SQL procedure successfully completed.
+
+SQL> select name, ctime, how_created from sys.wri$_adv_tasks
+where owner_name = 'SYS'
+and name in ('AUTO_STATS_ADVISOR_TASK','INDIVIDUAL_STATS_ADVISOR_TASK');  2    3
+
+NAME                                                                                                                             CTIME     HOW_CREATED
+-------------------------------------------------------------------------------------------------------------------------------- --------- ------------------------------
+AUTO_STATS_ADVISOR_TASK                                                                                                          13-APR-19 CMD
+INDIVIDUAL_STATS_ADVISOR_TASK                                                                                                    13-APR-19 CMD
+
+
+
+SQL> select client_name, status, window_group from dba_autotask_client;
+
+CLIENT_NAME                       STATUS   WINDOW_GROUP
+--------------------------------- -------- ----------------------------------------------------------------
+sql tuning advisor                ENABLED  ORA$AT_WGRP_SQ
+auto optimizer stats collection   ENABLED  ORA$AT_WGRP_OS
+auto space advisor                ENABLED  ORA$AT_WGRP_SA
+
+SQL> select * from dba_scheduler_window_groups;
+
+WINDOW_GROUP_NAME         ENABL NUMBER_OF_WINDOWS NEXT_START_DATE                      COMMENTS
+------------------------- ----- ----------------- ------------------------------------ ----------------------------------------
+MAINTENANCE_WINDOW_GROUP  TRUE                  7 13-APR-19 06.00.00.000000 AM +08:00  Window group for Automated Maintenance
+ORA$AT_WGRP_OS            TRUE                  7 13-APR-19 06.00.00.000000 AM +08:00  auto optimizer stats collection
+ORA$AT_WGRP_SA            TRUE                  7 13-APR-19 06.00.00.000000 AM +08:00  auto space advisor
+ORA$AT_WGRP_SQ            TRUE                  7 13-APR-19 06.00.00.000000 AM +08:00  sql tuning advisor
+
+
+The next schedule time will start at 13-APR-19 06.00.00.000000 AM +08:00.
