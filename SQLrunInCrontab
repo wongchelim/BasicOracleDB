@@ -1,0 +1,38 @@
+I created a script to run every 2 hours sharp at 0 minute.
+
+to edit a crontab job in linux 7.
+=========================================================
+crontab -e
+
+crontab information as per below
+=========================================================
+
+##job creation
+0 */2 * * * /u01/app/oracle/autoscripts/dumm.sh >/dev/null 2>&1
+
+
+
+
+
+
+Files as per below on that directory.
+==================================================================================================================
+dumm.sh
+=========================================================
+#!/bin/sh
+source /home/oracle/.bash_profile
+sqlplus "/ as sysdba" @/u01/app/oracle/autoscripts/dumm.sql
+
+
+dumm.sql
+=========================================================
+spool /u01/app/oracle/autoscripts/dummy.log
+prompt 1..1500
+begin
+FOR i in 1..1500
+loop
+update DUMM.INVOICE set invoice_cat = dbms_random.string('U', 1) where invoice_no = dbms_random.value(1, 1500);
+end loop;
+commit;
+end;
+/
