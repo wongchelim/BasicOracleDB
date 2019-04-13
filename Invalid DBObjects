@@ -1,0 +1,23 @@
+Get the DB invalid objects
+====================================================================================================================================
+select owner, object_name,object_type,LAST_DDL_TIME, CREATED from dba_objects where status ='INVALID' order by owner,3,2;
+
+We can manual compile them. But need to capture the time when the invalid objects been found.
+====================================================================================================================================
+ALTER PACKAGE &my_package COMPILE;
+ALTER PACKAGE &my_package COMPILE BODY;
+ALTER PROCEDURE &my_procedure COMPILE;
+ALTER FUNCTION &my_function COMPILE;
+ALTER TRIGGER &my_trigger COMPILE;
+ALTER VIEW &my_view COMPILE;
+alter synonym &ownerObjectname compile;
+
+or you with dba privileges can run using the below...
+====================================================================================================================================
+SQL> @"$ORACLE_HOME/rdbms/admin/utlrp.sql"
+
+
+If still encounter error after recompile.
+Check for that errors.
+====================================================================================================================================
+SELECT * FROM dba_ERRORS WHERE NAME like upper('%&name%');
