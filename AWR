@@ -1,0 +1,52 @@
+From basic->advance troubleshoot you need AWR report to make better decision to solve performance issue inside the oracle db.
+This is a extra pay service to Oracle.
+
+To generate a AWR report on the current instance only.
+============================================================
+@$ORACLE_HOME/rdbms/admin/awrrpt.sql
+
+To generate a AWR report on various nodes
+============================================================
+11gr1
+@$ORACLE_HOME/rdbms/admin/spawrrac.sql
+12c
+sql> @$ORACLE_HOME/rdbms/admin/awrgrpt.sql
+
+Compare the AWR snapshots
+============================================================
+12c
+sql> @$ORACLE_HOME/rdbms/admin/awrgdrpt.sql
+11gR1
+@$ORACLE_HOME/rdbms/admin/awrddrpt.sql
+
+If interested to check only 1 sql reflect inside the AWR.
+============================================================
+sql> @$ORACLE_HOME/rdbms/admin/@awrsqrpt.sql
+
+
+Change AWR retention period to allow snapshot to be retain inside the db. So it use for future analysis usage specially RCA.
+    sqlplus / as sysdba
+    SQL> @changeAWRretention.sql
+
+To change the interval snapshot of the.
+Note: this specially use if the db having different kind of sqls and have various sqls run inside the db. to avoid being missed by AWR...
+By default it configure by default 1 hour.
+
+11:05:05 SYS@SAMPLE1 SQL> select * from dba_hist_wr_control;
+
+      DBID SNAP_INTERVAL                                                               RETENTION                                                                   TOPNSQL        CON_ID
+---------- --------------------------------------------------------------------------- --------------------------------------------------------------------------- ---------- ----------
+4051706141 +00000 01:00:00.0                                                           +00008 00:00:00.0                                                           DEFAULT             0
+
+Elapsed: 00:00:00.02
+11:07:44 SYS@SAMPLE1 SQL> exec dbms_workload_repository.modify_snapshot_settings(interval => 30);
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.17
+11:09:37 SYS@SAMPLE1 SQL> select * from dba_hist_wr_control;
+
+      DBID SNAP_INTERVAL                                                               RETENTION                                                                   TOPNSQL        CON_ID
+---------- --------------------------------------------------------------------------- --------------------------------------------------------------------------- ---------- ----------
+4051706141 +00000 00:30:00.0                                                           +00008 00:00:00.0                                                           DEFAULT             0
+
