@@ -6,5 +6,14 @@ If require to have more specific custom setting please refer below link as per a
 
 https://docs.oracle.com/en/database/oracle/oracle-database/12.2/arpls/DBMS_STATS.html#GUID-CA6A56B9-0540-45E9-B1D7-D78769B7714C
 
+If before gather there are data inside below view
+select table_owner,table_name,partition_name,SUBPARTITION_NAME,inserts,updates,deletes,timestamp from dba_tab_modifications where upper(table_name) like upper('&tablename');
 
+once you execute below on that table it will disappaer from above view.
 execute dbms_stats.gather_table_stats(ownname=> 'DUMM',tabname=> 'SALES' ,estimate_percent=> DBMS_STATS.AUTO_SAMPLE_SIZE,granularity=> 'ALL',block_sample=> FALSE, cascade=> TRUE,degree=> DBMS_STATS.DEFAULT_DEGREE, method_opt=> 'FOR ALL COLUMNS SIZE AUTO');
+
+
+But do becareful as nothing are right forever.
+there are certain application not allow to update statistic on certain table, this is to avoid certain changes inside their database. such as SQL plan changes can be avoided.
+to able to achieve controling the statistic of certain table to control the execution plan, this will need a lot of knowlege on that application and extra work to administrate the DB.
+the best practise is to have the latest and updated statistic to let optimizer to manage the execution of the queries.
