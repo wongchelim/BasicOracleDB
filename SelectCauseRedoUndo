@@ -1,0 +1,83 @@
+All through my career in DBA. Some of the time I noticed that select have some relation with the redo log buffer.
+After did some research on the web 
+https://asktom.oracle.com/pls/asktom/f?p=100:11:0::::P11_QUESTION_ID:44798632736844#
+found that it is true and it had some explaination.
+
+
+prompt add in rows and updates sales
+DECLARE
+v_num number:=0;
+Begin
+Select count(*) into v_num from dumm.sales;
+FOR i in 1..15000
+loop
+v_num:=v_num+1;
+INSERT /*+ APPEND */ INTO DUMM.sales  (sales_no, sale_place, amount, sales_gender , sales_comment) VALUES (v_num, decode(dbms_random.value(1, 4),1,'MY',2,'US',3,'AMER','ENG'),dbms_random.value(1000, 10000), decode(mod(floor(dbms_random.value(1, 10)),2),0,'F','M'), 'No Comment');
+update DUMM.sales set sales_comment = decode(dbms_random.value(1, 4),1,'This is le',2,'ThisShort',3,'Moderate','Long') where sales_no = floor(dbms_random.value(1, 5500));
+end loop;
+commit;
+end;
+/
+
+13:50:20 SYS@SAMPLE1 SQL> /
+
+284500 rows selected.
+
+Elapsed: 00:00:07.67
+
+Execution Plan
+----------------------------------------------------------
+Plan hash value: 2712971339
+
+--------------------------------------------------------------------------------------------
+| Id  | Operation          | Name  | Rows  | Bytes | Cost (%CPU)| Time     | Pstart| Pstop |
+--------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT   |       |   268K|    11M|   549   (1)| 00:00:01 |       |       |
+|   1 |  PARTITION LIST ALL|       |   268K|    11M|   549   (1)| 00:00:01 |     1 |     4 |
+|   2 |   TABLE ACCESS FULL| SALES |   268K|    11M|   549   (1)| 00:00:01 |     1 |     4 |
+--------------------------------------------------------------------------------------------
+
+
+Statistics
+----------------------------------------------------------
+          1  recursive calls
+          1  db block gets
+      21914  consistent gets
+          0  physical reads
+        184  redo size
+   13656677  bytes sent via SQL*Net to client
+     220233  bytes received via SQL*Net from client
+      19968  SQL*Net roundtrips to/from client
+          0  sorts (memory)
+          0  sorts (disk)
+     299500  rows processed
+
+14:24:33 SYS@SAMPLE1 SQL> set autotrace traceonly statistic;
+14:25:18 SYS@SAMPLE1 SQL> /
+
+299500 rows selected.
+
+Elapsed: 00:00:07.57
+
+Statistics
+----------------------------------------------------------
+          0  recursive calls
+          0  db block gets
+      21900  consistent gets
+          0  physical reads
+          0  redo size
+   13656677  bytes sent via SQL*Net to client
+     220233  bytes received via SQL*Net from client
+      19968  SQL*Net roundtrips to/from client
+          0  sorts (memory)
+          0  sorts (disk)
+     299500  rows processed
+
+
+
+As said by Tom
+
+
+A select for update will generate both redo and undo.
+A read only select will USE undo (for read consistency)
+A read only select may GENERATE redo due to block cleanouts. Just may.
