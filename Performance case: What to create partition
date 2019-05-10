@@ -211,5 +211,6 @@ Elapsed: 00:00:00.05
 
 Elapsed: 00:00:00.04
 
+Answer: the partition table with correct partition will benefit and improve performance as compare to table without partition.
 
 Conclusion: It really depend on what is the purpose of usage on that table before you create partition on that table. As they really have no absolute answer without additional questions asked. Because creating a wrong partition will bring no benefit on your quesries.
