@@ -1,0 +1,215 @@
+
+In this case that I want to discuss is not about the display of syntax of create partition.
+The case I want to discuss is about how and what kind of partition need to create.
+There was an interview session mention they have trouble creating partition of a table and the problem that they describe ends there. … … …. Yes, really end there. What I can describe they totally do not know what to ask and how to and what is the best to create the partition. Of course I also believe they not stuck in the what is the syntax of creating the partition table.
+
+Here what I want to state is to create the partition of a table. There are plenty and many questions need to ask. 
+Please don't be afraid of asking back to get more information... in reality a SA(System analyst) gather such information from customer.
+Especially during a business analysis, requirement gathering, interview session and etc from the customer.
+
+How to create a partition table?
+We need to know 
+-	what are the table use for? Such as customer table, it is use for medical research? Or immigration administration? Because scenarios different will bring totally different outcome and proof of partition of that table will be useless.
+-	Which department will be using it and the size? We need to know how many concurrent users will be using it and others situations.
+-	How important the table is? We might need to place different tablespace to avoid datafile corruption.
+-	What are the queries to be execute toward the table? This is the most important question.
+
+Just to list some critical questions as above on decision which column should be partition of that table. 
+I believe above are worth more and mature than just how to create a partition.
+
+I created a sales table with partition base on country as my CEO want me to display number of sales records in respective sale_place.
+As this is mean important for the management team as they claim will look at this table daily on every morning and evening. I created a table to load the sales data into it with partition on sales_place column.
+
+Let me do some example of that sales table.
+Sales table consist of below number of records.
+
+13:43:10 SYS@SAMPLE1 SQL> 13:43:10 SYS@SAMPLE1 SQL> select sale_place, count(*) from DUMM.sales group by sale_place;
+
+SALE_PLACE             COUNT(*)
+-------------------- ----------
+MY                         1876
+US                         1841
+AMER                       1916
+ENG                      301367
+
+Elapsed: 00:00:00.05
+13:43:19 SYS@SAMPLE1 SQL> set autotrace traceonly;
+13:45:00 SYS@SAMPLE1 SQL> select * from DUMM.sales where SALE_PLACE = 'MY';
+
+1876 rows selected.
+
+Elapsed: 00:00:00.18
+
+Execution Plan
+----------------------------------------------------------
+Plan hash value: 3049260918
+
+-----------------------------------------------------------------------------------------------
+| Id  | Operation             | Name  | Rows  | Bytes | Cost (%CPU)| Time     | Pstart| Pstop |
+-----------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT      |       |     1 |    47 |     2   (0)| 00:00:01 |       |       |
+|   1 |  PARTITION LIST SINGLE|       |     1 |    47 |     2   (0)| 00:00:01 |   KEY |   KEY |
+|   2 |   TABLE ACCESS FULL   | SALES |     1 |    47 |     2   (0)| 00:00:01 |     1 |     1 |
+-----------------------------------------------------------------------------------------------
+
+
+Statistics
+----------------------------------------------------------
+         13  recursive calls
+          0  db block gets
+        234  consistent gets
+          0  physical reads
+          0  redo size
+      86372  bytes sent via SQL*Net to client
+       1983  bytes received via SQL*Net from client
+        127  SQL*Net roundtrips to/from client
+          0  sorts (memory)
+          0  sorts (disk)
+       1876  rows processed
+
+13:45:20 SYS@SAMPLE1 SQL> select * from DUMM.sales;
+
+307000 rows selected.
+
+Elapsed: 00:00:05.66
+
+Execution Plan
+----------------------------------------------------------
+Plan hash value: 2712971339
+
+--------------------------------------------------------------------------------------------
+| Id  | Operation          | Name  | Rows  | Bytes | Cost (%CPU)| Time     | Pstart| Pstop |
+--------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT   |       |   299K|    12M|   822   (1)| 00:00:01 |       |       |
+|   1 |  PARTITION LIST ALL|       |   299K|    12M|   822   (1)| 00:00:01 |     1 |     4 |
+|   2 |   TABLE ACCESS FULL| SALES |   299K|    12M|   822   (1)| 00:00:01 |     1 |     4 |
+--------------------------------------------------------------------------------------------
+
+
+Statistics
+----------------------------------------------------------
+          1  recursive calls
+          0  db block gets
+      22716  consistent gets
+          0  physical reads
+          0  redo size
+   14028993  bytes sent via SQL*Net to client
+     225734  bytes received via SQL*Net from client
+      20468  SQL*Net roundtrips to/from client
+          0  sorts (memory)
+          0  sorts (disk)
+     307000  rows processed
+
+13:46:01 SYS@SAMPLE1 SQL> select * from DUMM.sales where SALE_PLACE IN ('MY','ENG');
+
+303243 rows selected.
+
+Elapsed: 00:00:05.90
+
+Execution Plan
+----------------------------------------------------------
+Plan hash value: 2189111886
+
+-----------------------------------------------------------------------------------------------
+| Id  | Operation             | Name  | Rows  | Bytes | Cost (%CPU)| Time     | Pstart| Pstop |
+-----------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT      |       |   299K|    12M|   823   (1)| 00:00:01 |       |       |
+|   1 |  PARTITION LIST INLIST|       |   299K|    12M|   823   (1)| 00:00:01 |KEY(I) |KEY(I) |
+|   2 |   TABLE ACCESS FULL   | SALES |   299K|    12M|   823   (1)| 00:00:01 |KEY(I) |KEY(I) |
+-----------------------------------------------------------------------------------------------
+
+
+Statistics
+----------------------------------------------------------
+          1  recursive calls
+          0  db block gets
+      22297  consistent gets
+          0  physical reads
+          0  redo size
+   13857742  bytes sent via SQL*Net to client
+     222984  bytes received via SQL*Net from client
+      20218  SQL*Net roundtrips to/from client
+          0  sorts (memory)
+          0  sorts (disk)
+     303243  rows processed
+
+13:46:38 SYS@SAMPLE1 SQL>
+
+
+As you can see above, the SQL that select on specific partition will only look for that partition data and then perform a FTS on that partition only by looking at the partition list single and the consistent gets are small.
+As you can see above, the SQL that select all partition will have a FTS(full table scan) on all partition by looking at the partition list all and then table access full which aka FTS.
+As the last query it select 2 partition from that table. Then it perform FTS on those partitions that they select.
+
+
+I add another table without partition to demo the performance.
+
+CREATE TABLE DUMM.SALES_NOPART
+(sales_no    NUMBER NOT NULL,
+ sale_place  VARCHAR2(20)   NOT NULL,
+ amount      number,
+sales_gender varchar2(1),
+sales_comment varchar2(10),
+CONSTRAINT sales_no_np_pk PRIMARY KEY (sales_no) USING INDEX TABLESPACE SALES_TBS
+)
+TABLESPACE SALES_TBS;
+
+insert /*+ APPEND */ into DUMM.SALES_NOPART select  * from DUMM.SALES;
+
+14:49:47 SYS@SAMPLE1 SQL> select sale_place,count(*) from DUMM.SALES_NOPART group by sale_place;
+
+SALE_PLACE             COUNT(*)
+-------------------- ----------
+US                         1841
+ENG                      301367
+MY                         1876
+AMER                       1916
+
+Elapsed: 00:00:01.31
+
+
+
+by below SQL test case with no partition, it manages display records within 0.06 until 0.09 seconds
+select sale_place,count(*) from DUMM.SALES_NOPART group by sale_place;
+
+14:53:55 SYS@SAMPLE1 SQL> select * from DUMM.SALES_NOPART where SALE_PLACE = 'MY';
+
+1876 rows selected.
+
+Elapsed: 00:00:00.06
+
+14:54:13 SYS@SAMPLE1 SQL> /
+
+1876 rows selected.
+
+Elapsed: 00:00:00.09
+
+14:54:18 SYS@SAMPLE1 SQL> /
+
+1876 rows selected.
+
+Elapsed: 00:00:00.06
+
+
+
+by below SQL test case with partition, it manages display records within 0.04 until 0.05 seconds
+
+14:54:22 SYS@SAMPLE1 SQL> select * from DUMM.SALES where SALE_PLACE = 'MY';
+
+1876 rows selected.
+
+Elapsed: 00:00:00.04
+
+14:54:52 SYS@SAMPLE1 SQL> /
+
+1876 rows selected.
+
+Elapsed: 00:00:00.05
+
+14:54:55 SYS@SAMPLE1 SQL> /
+
+1876 rows selected.
+
+Elapsed: 00:00:00.04
+
+
+Conclusion: It really depend on what is the purpose of usage on that table before you create partition on that table. As they really have no absolute answer without additional questions asked. Because creating a wrong partition will bring no benefit on your quesries.
