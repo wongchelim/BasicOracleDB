@@ -1,0 +1,322 @@
+SQL tuning case 1
+I have a table sales_nopart and sales_agent
+I want to select information regarding all of the sales and the sale person data of the sale agent id 70.
+The query that i generate on the fly as per below....
+======================================================================================
+15:37:47 SYS@SAMPLE1 SQL> select * from dumm.sales_nopart A, dumm.SALES_agent where sale_agent=70;
+
+318250 rows selected.
+
+Elapsed: 00:00:06.29
+
+Execution Plan
+----------------------------------------------------------
+Plan hash value: 1741586652
+
+-------------------------------------------------------------------------------------
+| Id  | Operation            | Name         | Rows  | Bytes | Cost (%CPU)| Time     |
+-------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT     |              |   767K|    62M|  4745   (1)| 00:00:01 |
+|   1 |  MERGE JOIN CARTESIAN|              |   767K|    62M|  4745   (1)| 00:00:01 |
+|*  2 |   TABLE ACCESS FULL  | SALES_NOPART |  3070 |   143K|   579   (1)| 00:00:01 |
+|   3 |   BUFFER SORT        |              |   250 |  9500 |  4167   (1)| 00:00:01 |
+|   4 |    TABLE ACCESS FULL | SALES_AGENT  |   250 |  9500 |     1   (0)| 00:00:01 |
+-------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   2 - filter("SALE_AGENT"=70)
+
+
+Statistics
+----------------------------------------------------------
+          0  recursive calls
+          0  db block gets
+       3355  consistent gets
+          0  physical reads
+          0  redo size
+   19696591  bytes sent via SQL*Net to client
+     233984  bytes received via SQL*Net from client
+      21218  SQL*Net roundtrips to/from client
+          1  sorts (memory)
+          0  sorts (disk)
+     318250  rows processed
+
+15:37:47 SYS@SAMPLE1 SQL> select * from dumm.sales_nopart A, dumm.SALES_agent where sale_agent=70;
+
+318250 rows selected.
+
+Elapsed: 00:00:06.29
+
+15:43:43 SYS@SAMPLE1 SQL> select * from dumm.sales_nopart A, dumm.SALES_agent where sale_agent=70;
+
+318250 rows selected.
+
+Elapsed: 00:00:06.84
+
+
+After couple of run the sql elapsed time stay in the range of 6 to 7 seconds. Which is too long.
+If lets say this is a complex query which consist of multiple lines it will difficult to tune.
+Lets use the SQL tuning advisor
+Find the SQL ID.
+===========================================
+ select /*+ PARALLEL(8) */ b.inst_id, a.sid,a.sql_id,a.SQL_CHILD_NUMBER, b.sql_fulltext from gv$session a, gv$sqlarea b where a.sql_address=b.address and upper(b.sql_fulltext) like upper('%dumm.sales_nopart%')
+
+   INST_ID        SID SQL_ID        SQL_CHILD_NUMBER SQL_FULLTEXT
+---------- ---------- ------------- ---------------- ----------------------------------------------------------------------------------------------------------------------------------
+         1         22 7ur2g2pprb4xb                0 select /*+ PARALLEL(8) */ b.inst_id, a.sid,a.sql_id,a.SQL_CHILD_NUMBER, b.sql_fulltext from gv$session a, gv$sqlarea b where
+                                                     a.sql_address=b.address and upper(b.sql_fulltext) like upper('%dumm.sales_nopart%')
+
+         1        264 1pkty86wadzz9                2 select * from dumm.sales_nopart A, dumm.SALES_agent where sale_agent=70
+
+
+noticed that the sql id is 1pkty86wadzz9.
+
+Create the tuning task for that sql id.
+===========================================
+DECLARE
+l_sql_tune_task_id  VARCHAR2(100);
+BEGIN
+l_sql_tune_task_id := DBMS_SQLTUNE.create_tuning_task (
+sql_id      => '&sqlid',
+scope       => DBMS_SQLTUNE.scope_comprehensive,
+time_limit  => 18000,
+task_name   => '1pkty86wadzz9_tuning_task',
+description => 'Tuning task for statement 1pkty86wadzz9 in Cursor.');
+DBMS_OUTPUT.put_line('l_sql_tune_task_id: ' || l_sql_tune_task_id);
+END;
+/
+
+Run the tuning task.
+===========================================
+15:29:36 SYS@SAMPLE1 SQL> EXEC DBMS_SQLTUNE.EXECUTE_TUNING_TASK(task_name=>'&taskname');
+Enter value for taskname: 1pkty86wadzz9_tuning_task
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:02.32
+
+
+TASK_NAME                                                                                                                        STATUS
+-------------------------------------------------------------------------------------------------------------------------------- -----------
+1pkty86wadzz9_tuning_task                                                                                                        COMPLETED
+
+
+
+Get the recommendation
+===========================================
+SELECT DBMS_SQLTUNE.report_tuning_task('1pkty86wadzz9_tuning_task') AS recommendations FROM dual
+
+
+
+RECOMMENDATIONS
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+GENERAL INFORMATION SECTION
+-------------------------------------------------------------------------------
+Tuning Task Name   : 1pkty86wadzz9_tuning_task
+Tuning Task Owner  : SYS
+Workload Type      : Single SQL Statement
+Scope              : COMPREHENSIVE
+Time Limit(seconds): 18000
+Completion Status  : COMPLETED
+Started at         : 05/17/2019 15:30:12
+Completed at       : 05/17/2019 15:30:14
+
+-------------------------------------------------------------------------------
+Schema Name: SYS
+SQL ID     : 1pkty86wadzz9
+SQL Text   : select * from dumm.sales_nopart A, dumm.SALES_agent where
+             sale_agent=70
+
+-------------------------------------------------------------------------------
+FINDINGS SECTION (2 findings)
+-------------------------------------------------------------------------------
+
+1- Restructure SQL finding (see plan 1 in explain plans section)
+----------------------------------------------------------------
+  An expensive cartesian product operation was found at line ID 1 of the
+  execution plan.
+
+  Recommendation
+  --------------
+  - Consider removing the disconnected table or view from this statement or
+    add a join condition which refers to it.
+
+2- Alternative Plan Finding
+---------------------------
+  Some alternative execution plans for this statement were found by searching
+  the system's real-time and historical performance data.
+
+  The following table lists these plans ranked by their average elapsed time.
+  See section "ALTERNATIVE PLANS SECTION" for detailed information on each
+  plan.
+
+  id plan hash  last seen            elapsed (s)  origin          note
+  -- ---------- -------------------- ------------ --------------- ----------------
+   1 1741586652  2019-05-17/15:27:57        0.529 Cursor Cache    original plan
+   2  236409177  2019-05-17/15:18:23        0.742 Cursor Cache
+
+  Information
+  -----------
+  - The Original Plan appears to have the best performance, based on the
+    elapsed time per execution.  However, if you know that one alternative
+    plan is better than the Original Plan, you can create a SQL plan baseline
+    for it. This will instruct the Oracle optimizer to pick it over any other
+    choices in the future.
+    execute dbms_sqltune.create_sql_plan_baseline(task_name =>
+            '1pkty86wadzz9_tuning_task', owner_name => 'SYS', plan_hash_value
+            => xxxxxxxx);
+
+-------------------------------------------------------------------------------
+EXPLAIN PLANS SECTION
+-------------------------------------------------------------------------------
+
+1- Original
+-----------
+Plan hash value: 1741586652
+
+-------------------------------------------------------------------------------------
+| Id  | Operation            | Name         | Rows  | Bytes | Cost (%CPU)| Time     |
+-------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT     |              |   767K|    62M|  4745   (1)| 00:00:01 |
+|   1 |  MERGE JOIN CARTESIAN|              |   767K|    62M|  4745   (1)| 00:00:01 |
+|*  2 |   TABLE ACCESS FULL  | SALES_NOPART |  3070 |   143K|   579   (1)| 00:00:01 |
+|   3 |   BUFFER SORT        |              |   250 |  9500 |  4167   (1)| 00:00:01 |
+|   4 |    TABLE ACCESS FULL | SALES_AGENT  |   250 |  9500 |     1   (0)| 00:00:01 |
+-------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   2 - filter("SALE_AGENT"=70)
+
+-------------------------------------------------------------------------------
+ALTERNATIVE PLANS SECTION
+-------------------------------------------------------------------------------
+
+Plan 2
+------
+
+  Plan Origin                 :Cursor Cache
+  Plan Hash Value             :236409177
+  Executions                  :1
+  Elapsed Time                :0.742 sec
+  CPU Time                    :0.247 sec
+  Buffer Gets                 :32202
+  Disk Reads                  :0
+  Disk Writes                 :0
+
+Notes:
+  1. Statistics shown are averaged over multiple executions.
+
+-----------------------------------------------------------------------------------
+| Id  | Operation          | Name         | Rows  | Bytes | Cost (%CPU)| Time     |
+-----------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT   |              |   100 |  8600 |     4   (0)| 00:00:01 |
+|   1 |  NESTED LOOPS      |              |   100 |  8600 |     4   (0)| 00:00:01 |
+|*  2 |   TABLE ACCESS FULL| SALES_NOPART |     1 |    48 |     2   (0)| 00:00:01 |
+|   3 |   TABLE ACCESS FULL| SALES_AGENT  |   100 |  3800 |     2   (0)| 00:00:01 |
+-----------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   2 - filter("SALE_AGENT"=70)
+
+Plan 1
+------
+
+  Plan Origin                 :Cursor Cache
+  Plan Hash Value             :1741586652
+  Executions                  :2
+  Elapsed Time                :0.529 sec
+  CPU Time                    :0.155 sec
+  Buffer Gets                 :3355
+  Disk Reads                  :0
+  Disk Writes                 :0
+
+Notes:
+  1. Statistics shown are averaged over multiple executions.
+  2. The plan matches the original plan.
+
+-------------------------------------------------------------------------------------
+| Id  | Operation            | Name         | Rows  | Bytes | Cost (%CPU)| Time     |
+-------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT     |              |   767K|    62M|  4745   (1)| 00:00:01 |
+|   1 |  MERGE JOIN CARTESIAN|              |   767K|    62M|  4745   (1)| 00:00:01 |
+|*  2 |   TABLE ACCESS FULL  | SALES_NOPART |  3070 |   143K|   579   (1)| 00:00:01 |
+|   3 |   BUFFER SORT        |              |   250 |  9500 |  4167   (1)| 00:00:01 |
+|   4 |    TABLE ACCESS FULL | SALES_AGENT  |   250 |  9500 |     1   (0)| 00:00:01 |
+-------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   2 - filter("SALE_AGENT"=70)
+
+-------------------------------------------------------------------------------
+
+
+Elapsed: 00:00:01.23
+
+
+After all the long set of recommendations plus details
+Please noticed below...
+
+  Recommendation
+  --------------
+  - Consider removing the disconnected table or view from this statement or
+    add a join condition which refers to it.
+
+and found that there are unwanted or mistaken sql selection. it is a human error.
+
+after removing the mistakes, the sql generated within less than a second.
+this is to demo of the SQL tuning advisor speed up the SQL tuning.
+
+
+
+
+select * from dumm.sales_nopart A, dumm.SALES_agent B where A.sale_agent=B.sales_agent_id and A.sale_agent=70;
+
+15:43:53 SYS@SAMPLE1 SQL> select * from dumm.sales_nopart A, dumm.SALES_agent B where A.sale_agent=B.sales_agent_id and A.sale_agent=70;
+
+1273 rows selected.
+
+Elapsed: 00:00:00.07
+
+Execution Plan
+----------------------------------------------------------
+Plan hash value: 1037882026
+
+-----------------------------------------------------------------------------------------------
+| Id  | Operation                    | Name           | Rows  | Bytes | Cost (%CPU)| Time     |
+-----------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT             |                |  3070 |   257K|   580   (1)| 00:00:01 |
+|   1 |  NESTED LOOPS                |                |  3070 |   257K|   580   (1)| 00:00:01 |
+|   2 |   TABLE ACCESS BY INDEX ROWID| SALES_AGENT    |     1 |    38 |     1   (0)| 00:00:01 |
+|*  3 |    INDEX UNIQUE SCAN         | SALES_AGENT_PK |     1 |       |     1   (0)| 00:00:01 |
+|*  4 |   TABLE ACCESS FULL          | SALES_NOPART   |  3070 |   143K|   579   (1)| 00:00:01 |
+-----------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   3 - access("B"."SALES_AGENT_ID"=70)
+   4 - filter("A"."SALE_AGENT"=70)
+
+
+Statistics
+----------------------------------------------------------
+          0  recursive calls
+          0  db block gets
+       2169  consistent gets
+          0  physical reads
+          0  redo size
+      68380  bytes sent via SQL*Net to client
+       1532  bytes received via SQL*Net from client
+         86  SQL*Net roundtrips to/from client
+          0  sorts (memory)
+          0  sorts (disk)
+       1273  rows processed
+
