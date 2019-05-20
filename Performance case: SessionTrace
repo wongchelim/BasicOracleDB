@@ -1,0 +1,137 @@
+When you found a SQL execute differently in the production as compare to the non-production environment.
+It could due to many reasons, and mostly will and can resolve using various methods.
+But if you need to perform RCA(Root Cause Analysis) on the case to justify you solution to all parties.
+Below might be 1 of many steps that can help you.
+We might need to know is there something else than the SQL itself really affect the outcome of the execution plan. such as make a bad or good plan.
+
+Please refer below....
+
+
+
+This is to demo to use event 10046(gather extended information) to trace a session.
+
+You can get the session information by running from their side. 
+===============================================================================================================================================
+column SID format a5
+column current_user format a15
+column session_user format a15
+column db_name format a10
+select
+   sys_context('USERENV','SID') SID, sys_context( 'userenv', 'current_user' ) current_user,sys_context( 'userenv', 'current_user' ), sys_context( 'userenv', 'session_user' ) session_user, sys_context('userenv','db_name') db_name
+from dual;
+
+Or get the session by looking at the current open sessions etc.
+Once you got the session id, use below to get more information including the pid-process id.
+===============================================================================================================================================
+SET LINESIZE 1000
+COLUMN spid FORMAT A5
+COLUMN username FORMAT A13
+COLUMN OWNER FORMAT A10
+COLUMN program FORMAT A40
+COLUMN machine FORMAT A25
+COLUMN Logon_time FORMAT A20
+COLUMN Module FORMAT A18
+COLUMN Status Format a8
+COLUMN SID format 99999;
+COLUMN osuser format a15;
+COLUMN SERVICE_NAME format A25;
+Column SERIAL# format 99999;
+Column TERMINAL format a10;
+COLUMN INST_ID format 999;
+SELECT s.inst_id,  s.sid,  s.serial#,  p.spid,  s.username,s.osuser,  s.status, s.program, s.machine, s.module,  to_char(logon_time,'dd-MON-YYYY HH24:mm:ss') Logon_time FROM   gv$session s  JOIN gv$process p ON p.addr = s.paddr AND p.inst_id = s.inst_id WHERE  s.type != 'BACKGROUND' and s.sid=&sid order by s.inst_id;
+
+INST_ID    SID SERIAL# SPID  USERNAME      OSUSER          STATUS   PROGRAM                                  MACHINE                   MODULE             LOGON_TIME
+------- ------ ------- ----- ------------- --------------- -------- ---------------------------------------- ------------------------- ------------------ --------------------
+      1     60   12637 14136 SYS           oracle          ACTIVE   sqlplus@xxxxxxxxxx (TNS V1-V3)           xxxxxxxxxx                sqlplus@xxxxxxxxxx 20-MAY-2019 13:05:51
+                                                                                                                                        (TNS V1-V3)
+
+SYS@SAMPLE1 SQL> oradebug setospid 14136
+Oracle pid: 38, Unix process pid: 14136, image: oracle@xxxxxxxxxx (TNS V1-V3)
+SYS@SAMPLE1 SQL> oradebug unlimit
+Statement processed.
+SYS@SAMPLE1 SQL> oradebug event 10046 trace name context forever,level 12
+Statement processed.
+SYS@SAMPLE1 SQL> oradebug tracefile_name
+/u01/app/oracle/diag/rdbms/sample/sample1/trace/sample1_ora_14136.trc
+
+The user session are starting to collect informations and its previous informations as well....
+Once done.
+Turn off the tracing.
+===============================================================================================================================================
+SYS@SAMPLE1 SQL> oradebug event 10046 trace name context off
+ORA-00074: no process has been specified
+SYS@SAMPLE1 SQL> oradebug setospid 14136
+Oracle pid: 55, Unix process pid: 14136, image: oracle@xxxxxxxxxx (TNS V1-V3)
+SYS@SAMPLE1 SQL> oradebug event 10046 trace name context off
+Statement processed.
+SYS@SAMPLE1 SQL> exit
+
+Extract and format the contents of the trace file and transalte output into a more readable output file.
+===============================================================================================================================================
+tkprof /u01/app/oracle/diag/rdbms/sample/sample1/trace/sample1_ora_14136.trc sample.txt explain='/ as sysdba' sort='(fchela,prsela,exeela)'
+
+Open the file
+============================================================================
+vim sample.txt
+
+Output
+===============================================================================================================================================
+TKPROF: Release 12.2.0.1.0 - Development on Mon May 20 14:31:36 2019
+
+Copyright (c) 1982, 2017, Oracle and/or its affiliates.  All rights reserved.
+
+Trace file: /u01/app/oracle/diag/rdbms/sample/sample1/trace/sample1_ora_14136.trc
+Sort options: fchela  prsela  exeela
+********************************************************************************
+count    = number of times OCI procedure was executed
+cpu      = cpu time in seconds executing
+elapsed  = elapsed time in seconds executing
+disk     = number of physical reads of buffers from disk
+query    = number of buffers gotten for consistent read
+current  = number of buffers gotten in current mode (usually for update)
+rows     = number of rows processed by the fetch or execute call
+********************************************************************************
+
+error connecting to database using: sys/oracle@sample
+ORA-28009: connection as SYS should be as SYSDBA or SYSOPER
+
+EXPLAIN PLAN option disabled.
+********************************************************************************
+SQL ID: 37pn79101dpqb Plan Hash: 448100919
+
+update dumm.sales_nopart set product_id=(select * from (select p.product_id
+  from dumm.product p order by dbms_random.value)
+where
+ rownum =1) where sales_no=5
+
+
+call     count       cpu    elapsed       disk      query    current        rows
+------- ------  -------- ---------- ---------- ---------- ----------  ----------
+Parse        1      0.06       0.08          0          0          0           0
+Execute      1      0.12       0.19          5        196          4           1
+Fetch        0      0.00       0.00          0          0          0           0
+------- ------  -------- ---------- ---------- ---------- ----------  ----------
+total        2      0.19       0.27          5        196          4           1
+
+Misses in library cache during parse: 1
+Optimizer mode: ALL_ROWS
+Parsing user id: SYS
+Number of plan statistics captured: 1
+
+Rows (1st) Rows (avg) Rows (max)  Row Source Operation
+---------- ---------- ----------  ---------------------------------------------------
+         0          0          0  UPDATE  SALES_NOPART (cr=1884 pr=5 pw=0 time=239036 us starts=1)
+         1          1          1   TABLE ACCESS BY INDEX ROWID SALES_NOPART (cr=3 pr=5 pw=0 time=34372 us starts=1 cost=1 size=9 card=1)
+         1          1          1    INDEX UNIQUE SCAN SALES_NO_NP_PK (cr=2 pr=0 pw=0 time=48 us starts=1 cost=1 size=0 card=1)(object id 76088)
+         1          1          1   COUNT STOPKEY (cr=1881 pr=0 pw=0 time=204198 us starts=1)
+         1          1          1    VIEW  (cr=1881 pr=0 pw=0 time=204176 us starts=1 cost=2 size=200 card=50)
+         1          1          1     SORT ORDER BY STOPKEY (cr=1881 pr=0 pw=0 time=204172 us starts=1 cost=2 size=200 card=50)
+        50         50         50      INDEX FULL SCAN PRODUCT_PK (cr=1 pr=0 pw=0 time=1697 us starts=1 cost=1 size=200 card=50)(object id 76129)
+
+********************************************************************************
+
+
+Findings here is to show that the SQL using Optimizer mode: ALL_ROWS before running the SQL. 
+Thus, it will contribute reason why it choose this plan to run the query.
+
+
