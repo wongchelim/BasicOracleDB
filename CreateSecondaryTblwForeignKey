@@ -1,0 +1,30 @@
+By Creating the table with the link the foreign key is created inside the secondary table.
+such as if student table and with the class table.
+the student gone in many classes. 
+there should have a enrollment table which is the tables consist of data from student table and class table. which make it normalize.
+the table enrollment should consist of foreign keys that point to student table primary key and another foreign key that point to the class table primary key.
+
+if there do not have enrollment table and not allow to create additional table. this make us to use class table as the join table.
+the foreign key need to created inside class table. this will make the table unnormalize, but still workable.
+
+another example of sales table and salesitem table.
+
+CREATE TABLE DUMM.SALESN
+(sales_no    NUMBER NOT NULL,
+ sale_place  VARCHAR2(5)   NOT NULL,
+ amount      number,
+sales_gender varchar2(1),
+sales_comment varchar2(50),
+CONSTRAINT salesn_pk PRIMARY KEY (sales_no) USING INDEX TABLESPACE SALES_TBS
+)
+TABLESPACE SALES_TBS;
+
+CREATE TABLE DUMM.SALESITEM
+(sales_no    NUMBER NOT NULL,
+ itemid  NUMBER NOT NULL,
+ itemcost      number,
+item_description varchar2(50),
+CONSTRAINT itemidn_pk PRIMARY KEY (itemid) USING INDEX TABLESPACE SALES_TBS,
+CONSTRAINT itemidn_fk FOREIGN KEY (sales_no) REFERENCES DUMM.SALESN(sales_no)
+)
+TABLESPACE SALES_TBS;
