@@ -1,0 +1,41 @@
+Some security parameter need to set and enable such as below.
+
+SEC_RETURN_SERVER_RELEASE_BANNER
+=====================================================================================
+Which return information of a database back to unauthenticated clients.
+This should be set to false.
+
+
+O7_DICTIONARY_ACCESSIBILITY
+=====================================================================================
+To disable unauthenticated clients to perform select on v$ views and dba views.
+This should be set to false.
+
+SEC_MAX_FAILED_LOGIN_ATTEMPTS
+=====================================================================================
+To allow a numbers of failed attempts to login to the DB.
+
+SEC_CASE_SENSITIVE_LOGON
+=====================================================================================
+To allow different case of an alphabet for a password to pass.
+This should be true
+
+
+Avoid java.io.FilePermission to be grant to user.
+Such as below. To avoid user to perform unnecessarily operation inside the db servers 
+=====================================================================================
+dbms_java.grant_permission
+begin
+  dbms_java.grant_permission
+   ('SCOTT',
+   'java.io.FilePermission',
+   '<<ALL FILES>>',
+   'execute');
+  dbms_java.grant_permission
+   ('SCOTT',
+   'java.lang.RuntimePermission',
+   '*',
+   'writeFileDescriptor' );
+end;
+
+SELECT * FROM DBA_JAVA_POLICY
