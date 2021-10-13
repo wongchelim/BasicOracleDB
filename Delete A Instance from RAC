@@ -1,0 +1,143 @@
+*****************************
+*****************************
+First Phase DB HOME
+*****************************
+*****************************
+in CRS check nodes
+==================================
+olsnodes -n
+crsctl query css votedisk
+ocrcheck
+srvctl status database -d orcl -v
+srvctl config database -d orcl
+srvctl config service -d orcl
+srvctl status service -d orcl
+crsctl status res -t
+
+Delete Instance using dbca
+====================================================
+Login to the node1 to delete the instance 2
+. ~/db.env
+dbca -silent -deleteInstance -nodeList servername2 -gdbName ORCL -instanceName orcl2 -sysDBAUserName sys -sysDBAPassword oracle
+srvctl status database -d orcl -v
+srvctl config service -d orcl -v
+
+Check current db environment after the delete instance
+================================================================
+Login to the node 1
+. ~/db.env
+select inst_id, instance_name, status,
+to_char(startup_time,'DD-MON-YYYY HH24:MI:SS') as "START_TIME"
+from gv$instance order by inst_id;  
+select thread#,instance from v$thread;
+select  tablespace_name from dba_tablespaces where tablespace_name like '%UNDO%';
+
+* All undo and redo objects are cleaned for orcl2 at this point.
+
+Check listener on node 1
+------------------------
+srvctl config listener -a
+
+
+Update the nodelist
+====================================================
+Go to node 2
+. ~/db.env
+cat /u01/app/oraInventory/ContentsXML/inventory.xml
+cd /u01/app/oracle/product/11.2.0/dbhome_1/oui/bin
+./runInstaller -updateNodeList ORACLE_HOME=$ORACLE_HOME "CLUSTER_NODES={servername2}" CRS=TRUE -local -silent
+
+Remove Oracle home in node 2
+====================================================
+Go to node 2
+. ~/db.env
+cd /u01/app/oracle/product/11.2.0/dbhome_1/deinstall/
+vi /tmp/sim.rsp
+key in ==>   REMOVE_HOMES=/u01/app/oracle/product/11.2.0/dbhome_1
+./deinstall -silent -paramfile /tmp/sim.rsp -local
+
+
+On only one of the remaining nodes to update inventory
+====================================================
+Go to node 1
+. db.env
+cd /u01/app/oracle/product/11.2.0/dbhome_1/oui/bin
+cat /u01/app/oraInventory/ContentsXML/inventory.xml
+./runInstaller -updateNodeList ORACLE_HOME=$ORACLE_HOME "CLUSTER_NODES={servername1}"
+
+Verify the inventory list got update
+====================================================
+Go to node 1
+. crs.env
+cat /u01/app/oraInventory/ContentsXML/inventory.xml
+
+
+*****************************
+*****************************
+Second Phase CRS HOME
+*****************************
+*****************************
+
+
+Removing Node 2 from the Cluster
+====================================================
+Check cluster
+---------------
+Go to node 1
+. ~/crs.env
+olsnodes -s -t
+Go to node 2
+. crs.env
+olsnodes -s -t
+
+Disable clusterware
+--------------------
+Go to node 2
+. ~/crs.env
+cd /u01/app/grid/product/11.2.0/grid_1/crs/install
+su -c "./rootcrs.pl -deconfig -force"
+
+Go to node 1
+. ~/crs.env
+su -c "crsctl delete node -n servername2"
+olsnodes -s -t
+
+Update inventory list in node 2 for the gridhome
+====================================================
+Go to node 2
+. ~/crs.env
+cd /u01/app/grid/product/11.2.0/grid_1/oui/bin
+./runInstaller -updateNodeList ORACLE_HOME=/u01/app/grid/product/11.2.0/grid_1 "CLUSTER_NODES={servername2}" CRS=TRUE -silent -local
+
+Deinstall the grid home from the node 2
+====================================================
+Go to node 2
+. ~/crs.env
+vi /tmp/sim.rsp
+key in ==>   REMOVE_HOMES=/u01/app/grid/product/11.2.0/grid_1
+cd /u01/app/grid/product/11.2.0/grid_1/deinstall
+./deinstall -silent -paramfile /tmp/sim.rsp -local
+
+
+Update inventory list in node 1 for the gridhome
+====================================================
+Go to node 1
+. ~/crs.env
+cat /u01/app/oraInventory/ContentsXML/inventory.xml
+cd /u01/app/grid/product/11.2.0/grid_1/oui/bin
+./runInstaller -updateNodeList ORACLE_HOME=/u01/app/grid/product/11.2.0/grid_1 "CLUSTER_NODES={servername1}" CRS=TRUE -silent -local
+cat /u01/app/oraInventory/ContentsXML/inventory.xml
+
+Post Verification
+====================================================
+Go to Node 1
+. ~/crs.env
+cluvfy stage -post nodedel -n servername1 -verbose
+olsnodes -s -t
+crsctl status res -t
+
+
+The database can be bounce later on
+====================================================
+alter system set cluster_database=false scope=spfile sid='*';
+alter system set cluster_database_instances=1 scope=spfile sid='*';
